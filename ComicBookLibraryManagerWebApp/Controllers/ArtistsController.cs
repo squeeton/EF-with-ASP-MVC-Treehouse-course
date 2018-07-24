@@ -1,4 +1,6 @@
-﻿using ComicBookShared.Models;
+﻿using ComicBookShared.Data;
+using ComicBookShared.Models;
+using System.Data.Entity;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,12 +13,19 @@ namespace ComicBookLibraryManagerWebApp.Controllers
     /// <summary>
     /// Controller for the "Artists" section of the website.
     /// </summary>
-    public class ArtistsController : Controller
+    public class ArtistsController : BaseController
     {
+
+        private ArtistRepository _ArtistRepo= null;
+
+        public ArtistsController()
+        {
+            _ArtistRepo = new ArtistRepository(Context);
+        }
+
         public ActionResult Index()
         {
-            // TODO Get the artists list.
-            var artists = new List<Artist>();
+            var artists = _ArtistRepo.GetList();
 
             return View(artists);
         }
@@ -28,8 +37,7 @@ namespace ComicBookLibraryManagerWebApp.Controllers
                 return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
             }
 
-            // TODO Get the artist.
-            var artist = new Artist();
+            var artist = _ArtistRepo.Get((int)id);
 
             if (artist == null)
             {
@@ -59,7 +67,7 @@ namespace ComicBookLibraryManagerWebApp.Controllers
 
             if (ModelState.IsValid)
             {
-                // TODO Add the artist.
+                _ArtistRepo.Add(artist);
 
                 TempData["Message"] = "Your artist was successfully added!";
 
@@ -76,8 +84,8 @@ namespace ComicBookLibraryManagerWebApp.Controllers
                 return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
             }
 
-            // TODO Get the artist.
-            var artist = new Artist();
+            var artist = _ArtistRepo.Get((int)id, 
+                includeRelatedEntities: false);
 
             if (artist == null)
             {
@@ -94,7 +102,7 @@ namespace ComicBookLibraryManagerWebApp.Controllers
 
             if (ModelState.IsValid)
             {
-                // TODO Update the artist.
+                _ArtistRepo.Update(artist);
 
                 TempData["Message"] = "Your artist was successfully updated!";
 
@@ -111,8 +119,7 @@ namespace ComicBookLibraryManagerWebApp.Controllers
                 return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
             }
 
-            // TODO Get the artist.
-            var artist = new Artist();
+            var artist = _ArtistRepo.Get((int)id);
 
             if (artist == null)
             {
@@ -125,7 +132,7 @@ namespace ComicBookLibraryManagerWebApp.Controllers
         [HttpPost]
         public ActionResult Delete(int id)
         {
-            // TODO Delete the artist.
+            _ArtistRepo.Delete(id);
 
             TempData["Message"] = "Your artist was successfully deleted!";
 
@@ -139,17 +146,17 @@ namespace ComicBookLibraryManagerWebApp.Controllers
         /// <param name="artist">The artist to validate.</param>
         private void ValidateArtist(Artist artist)
         {
-            //// If there aren't any "Name" field validation errors...
-            //if (ModelState.IsValidField("Name"))
-            //{
-            //    // Then make sure that the provided name is unique.
-            //    // TODO Call method to check if the artist name is available.
-            //    if (false)
-            //    {
-            //        ModelState.AddModelError("Name",
-            //            "The provided Name is in use by another artist.");
-            //    }
-            //}
+            // If there aren't any "Name" field validation errors...
+            if (ModelState.IsValidField("Name"))
+            {
+                // Then make sure that the provided name is unique.
+                // TODO Call method to check if the artist name is available.
+                if (_ArtistRepo.isArtistUnique(artist.Id, artist.Name))
+                {
+                    ModelState.AddModelError("Name",
+                        "The provided Name is in use by another artist.");
+                }
+            }
         }
     }
 }

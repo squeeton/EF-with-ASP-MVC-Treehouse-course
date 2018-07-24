@@ -15,24 +15,24 @@ namespace ComicBookLibraryManagerWebApp.Controllers
     /// <summary>
     /// Controller for the "Comic Books" section of the website.
     /// </summary>
-    public class ComicBooksController : Controller
+    public class ComicBooksController : BaseController
     {
-        private Context _context = null;
+        private ComicBooksRepository _comicBooksRepository = null;
+        private ComicBookSeriesRepository _seriesRepo = null;
+        private ArtistRepository _artistRepo = null;
 
         public ComicBooksController()
         {
-            _context = new Context();
+            _comicBooksRepository = new ComicBooksRepository(Context);
+            _seriesRepo = new ComicBookSeriesRepository(Context);
+            _artistRepo = new ArtistRepository(Context);
         }
 
         public ActionResult Index()
         {
             // TODO Get the comic books list.
             // Include the "Series" navigation property.
-            var comicBooks = _context.ComicBooks
-                    .Include(cb => cb.Series)
-                    .OrderBy(cb => cb.Series.Title)
-                    .ThenBy(cb => cb.IssueNumber)
-                    .ToList(); ;
+            var comicBooks = _comicBooksRepository.GetList();
 
             return View(comicBooks);
         }
@@ -46,12 +46,7 @@ namespace ComicBookLibraryManagerWebApp.Controllers
 
             // TODO Get the comic book.
             // Include the "Series", "Artists.Artist", and "Artists.Role" navigation properties.
-            var comicBook = _context.ComicBooks
-                    .Include(cb => cb.Series)
-                    .Include(cb => cb.Artists.Select(a => a.Artist))
-                    .Include(cb => cb.Artists.Select(a => a.Role))
-                    .Where(cb => cb.Id == id)
-                    .SingleOrDefault();
+            var comicBook = _comicBooksRepository.Get((int)id);
 
             if (comicBook == null)
             {
@@ -69,7 +64,7 @@ namespace ComicBookLibraryManagerWebApp.Controllers
             var viewModel = new ComicBooksAddViewModel();
 
             // TODO Pass the Context class to the view model "Init" method.
-            viewModel.Init(_context);
+            viewModel.Init(Repository, _seriesRepo, _artistRepo);
 
             return View(viewModel);
         }
@@ -84,8 +79,7 @@ namespace ComicBookLibraryManagerWebApp.Controllers
                 var comicBook = viewModel.ComicBook;
                 comicBook.AddArtist(viewModel.ArtistId, viewModel.RoleId);
 
-                _context.ComicBooks.Add(comicBook);
-                _context.SaveChanges();
+                _comicBooksRepository.Add(comicBook);
 
                 TempData["Message"] = "Your comic book was successfully added!";
 
@@ -93,7 +87,7 @@ namespace ComicBookLibraryManagerWebApp.Controllers
             }
 
             // TODO Pass the Context class to the view model "Init" method.
-            viewModel.Init(_context);
+            viewModel.Init(Repository, _seriesRepo, _artistRepo);
 
             return View(viewModel);
         }
@@ -105,9 +99,8 @@ namespace ComicBookLibraryManagerWebApp.Controllers
                 return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
             }
 
-            var comicBook = _context.ComicBooks
-                .Where(cb=>cb.Id==id)
-                .SingleOrDefault();
+            var comicBook = _comicBooksRepository.Get((int)id,
+                includeRelatedEntities:false);
 
             if (comicBook == null)
             {
@@ -118,7 +111,7 @@ namespace ComicBookLibraryManagerWebApp.Controllers
             {
                 ComicBook = comicBook
             };
-            viewModel.Init(_context);
+            viewModel.Init(Repository, _seriesRepo,_artistRepo);
 
             return View(viewModel);
         }
@@ -132,15 +125,14 @@ namespace ComicBookLibraryManagerWebApp.Controllers
             {
                 var comicBook = viewModel.ComicBook;
 
-                _context.Entry(comicBook).State = EntityState.Modified;
-                _context.SaveChanges();
+                _comicBooksRepository.Update(comicBook);
 
                 TempData["Message"] = "Your comic book was successfully updated!";
 
                 return RedirectToAction("Detail", new { id = comicBook.Id });
             }
 
-            viewModel.Init(_context);
+            viewModel.Init(Repository, _seriesRepo,_artistRepo);
 
             return View(viewModel);
         }
@@ -153,9 +145,7 @@ namespace ComicBookLibraryManagerWebApp.Controllers
             }
 
 
-            var comicBook = _context.ComicBooks.Include(cb => cb.Series)
-                .Where(cb => cb.Id == id)
-                .SingleOrDefault();
+            var comicBook = _comicBooksRepository.Get((int)id);
 
             if (comicBook == null)
             {
@@ -168,9 +158,8 @@ namespace ComicBookLibraryManagerWebApp.Controllers
         [HttpPost]
         public ActionResult Delete(int id)
         {
-            var comicBook = new ComicBook() { Id = id };
-            _context.Entry(comicBook).State = EntityState.Deleted;
-            _context.SaveChanges();
+
+            _comicBooksRepository.Delete(id);
 
             TempData["Message"] = "Your comic book was successfully deleted!";
 
@@ -188,34 +177,12 @@ namespace ComicBookLibraryManagerWebApp.Controllers
             if (ModelState.IsValidField("ComicBook.SeriesId") &&
                 ModelState.IsValidField("ComicBook.IssueNumber"))
             {
-               if (
-                    _context.ComicBooks
-                    .Any(cb=>cb.Id != comicBook.Id &&
-                        cb.SeriesId == comicBook.SeriesId &&
-                        cb.IssueNumber == comicBook.IssueNumber))
-                    
+                if (_comicBooksRepository.ComicBookSeriesHasIssueNumber(comicBook.Id, comicBook.SeriesId, comicBook.IssueNumber))                    
                 {
                     ModelState.AddModelError("ComicBook.IssueNumber",
                         "The provided Issue Number has already been entered for the selected Series.");
                 }
             }
-        }
-
-        private bool _disposed = false;
-
-        protected override void Dispose(bool disposing)
-        {
-            if (_disposed)
-                return;
-
-            if (disposing)
-            {
-                _context.Dispose();
-            }
-
-            _disposed = true;
-
-            base.Dispose(disposing);
         }
 
     }
